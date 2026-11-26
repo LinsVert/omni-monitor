@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+/data/
+.DS_Store
+
+# Android build & local secrets
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/google-services.json
+
+# Server secrets & local deployment overrides
+secrets/
+.env
+docker-compose.override.yml

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext HTTP for local LAN/emulator backend testing; use HTTPS for public VPS -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
