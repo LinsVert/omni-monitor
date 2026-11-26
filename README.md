@@ -1,13 +1,16 @@
 # omni-monitor
 
-Pluggable multi-scenario monitoring backend with **SQLite (WAL)**, **FastAPI**, **universal scalar + collection diff rule engine**, and **Google FCM push** for your Android APK.
+**English** | [简体中文](README.zh-CN.md)
+
+Pluggable multi-scenario monitoring backend with **SQLite (WAL)**, **FastAPI**, **universal scalar + collection diff rule engine**, and **Google FCM push** for your native Kotlin Android APK.
 
 ## Built-in Collector Plugins
 
 | `plugin_type` | Data Shape | Primary / Fallback Sources | Key Capabilities |
 | :--- | :--- | :--- | :--- |
-| `qdii_limits` | `collection` | EastMoney `fundcode_search.js` + `Fund_JJJZ_Data.aspx?t=8` | Enumerates 740+ QDII/overseas funds in 1 batch call; distinguishes holiday pauses (`暂停申购+暂停赎回`) from real quota halts (`暂停申购+开放赎回`) |
+| `qdii_limits` | `collection` | EastMoney `fundcode_search.js` + `Fund_JJJZ_Data.aspx?t=8` + Mobile `MAXSG` | Enumerates 740+ QDII/overseas funds in 1 batch call; distinguishes holiday pauses (`暂停申购+暂停赎回`) from real quota halts (`暂停申购+开放赎回`) and enriches standing limits on holidays |
 | `qdii_announcements` | `collection` | EastMoney F10 `JJGG?type=5` + `np-cnotice-stock` full text | T-1 early warning for OTC QDII limit-change notices with effective date & official PDF link |
+| `lof_arbitrage` | `scalar` + `items` | Internal LOF premium feed (`OMNI_LOF_API_URL`) + EastMoney live limits | Scans SZSE `16xxxx` LOFs during closing window (`14:30-14:55` CST), filters stale NAVs, and estimates 6-account tractor arbitrage profit |
 | `gold` | `scalar` | EastMoney Batch (`AU9999`/`GC00Y`/`XAU`) + `goldprice.org` + Binance `PAXGUSDT` | Domestic CNY/g, spot USD/oz, COMEX futures, and 24/7 gold token |
 | `us_stock` | `scalar` | Tencent Finance Batch (`qt.gtimg.cn`) + Nasdaq Official API | Collapses N ticker tasks into 1 HTTP request; optional US Eastern trading-hours filter |
 | `http_json` | `scalar`/`state` | Any public JSON URL | Zero-code monitoring via dot-path (`data.price`, `items.0.xauPrice`) or content hash |

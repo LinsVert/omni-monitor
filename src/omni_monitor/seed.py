@@ -125,6 +125,7 @@ def seed_default_tasks(storage: Storage) -> int:
                 "min_scale_cny": 10000000.0,
                 "szse_16_only": True,
                 "friction_pct": 0.25,
+                "max_nav_age_days": 4,
                 "trading_window_only": True,
             },
             rule=RuleConfig(type="threshold", field="value", op="gte", target=1.0),

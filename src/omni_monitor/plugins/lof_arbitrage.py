@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -38,9 +38,29 @@ class LofArbitrageConfig(BaseModel):
     friction_pct: float = Field(
         default=0.25, description="1 折申购 + 免五卖出综合摩擦成本 (%)"
     )
+    max_nav_age_days: int = Field(
+        default=4,
+        ge=0,
+        description="允许的最大净值滞后自然日数（过滤周净值/长期停更假溢价，0 表示不过滤）",
+    )
     trading_window_only: bool = Field(
         default=True, description="开启后仅在工作日 14:30-14:55 尾盘自动推送窗口执行"
     )
+
+
+def is_nav_fresh(nav_time: str, max_age_days: int, today: date | None = None) -> bool:
+    """Return False if nav_time (YYYY-MM-DD...) is older than max_age_days."""
+    if max_age_days <= 0:
+        return True
+    raw = nav_time.strip()
+    if len(raw) < 10:
+        return False
+    try:
+        nav_d = date.fromisoformat(raw[:10])
+    except ValueError:
+        return False
+    ref = today or datetime.now(CN_TZ).date()
+    return (ref - nav_d).days <= max_age_days
 
 
 async def _fetch_live_em_limits(client: httpx.AsyncClient) -> dict[str, dict[str, Any]]:
@@ -141,6 +161,9 @@ class LofArbitrageCollector(BaseCollector):
                 continue
             if scale > 0 and scale < config.min_scale_cny:
                 continue
+            nav_date = str(row.get("navTime") or "")
+            if not is_nav_fresh(nav_date, config.max_nav_age_days):
+                continue
 
             # Resolve real-time purchase limit (prefer live EastMoney over stale 21:00 cache)
             em_info = live_limits.get(code)
@@ -178,7 +201,6 @@ class LofArbitrageCollector(BaseCollector):
                 profit_text = f"每万元估赚 +{est_per_10k:g}元 (不限额)"
 
             lim_label = _fmt_limit(cat, daily_limit)
-            nav_date = str(row.get("navTime") or "")
             name = str(row.get("name") or code)
 
             opportunities.append(

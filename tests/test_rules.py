@@ -206,3 +206,14 @@ def test_lof_arbitrage_scalar_with_items_emits_diff_list() -> None:
     assert res.matched is True
     assert "161128" in res.summary
     assert any(b["type"] == "diff_list" for b in res.detail_blocks)
+
+
+def test_lof_is_nav_fresh_filters_stale_weekly_nav() -> None:
+    from datetime import date
+    from omni_monitor.plugins.lof_arbitrage import is_nav_fresh
+
+    today = date(2026, 11, 26)
+    assert is_nav_fresh("2026-11-25", max_age_days=4, today=today) is True
+    assert is_nav_fresh("2026-11-24", max_age_days=4, today=today) is True
+    assert is_nav_fresh("2026-11-20", max_age_days=4, today=today) is False
+    assert is_nav_fresh("2026-11-20", max_age_days=0, today=today) is True
