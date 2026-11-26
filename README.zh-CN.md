@@ -22,7 +22,7 @@
 | :--- | :--- | :--- | :--- |
 | `qdii_limits` | `collection` | 东财 `fundcode_search.js` + `Fund_JJJZ_Data.aspx?t=8` + 移动端 `MAXSG` | 枚举全市场 700+ QDII/海外基金，单次批量抓申购状态与单日限额；自动区分**海外节假日休市**与**真实额度停购**，休市日仍补全常驻限额 |
 | `qdii_announcements` | `collection` | 东财 F10 `JJGG?type=5` + `np-cnotice-stock` 正文直出 | T-1 场外 QDII 限购/暂停/恢复公告提前预警，抽取生效日期、限额与官方 PDF 直链 |
-| `lof_arbitrage` | `scalar` + `items` | 内部 LOF 溢价源（`OMNI_LOF_API_URL`）+ 东财实时限额 | 工作日尾盘 `14:30~14:55` 筛选深市 `16xxxx` 可拖拉机套利 LOF，过滤旧净值假溢价并估算一拖六收益 |
+| `lof_arbitrage` | `scalar` + `items` | 配套开源项目 [fund_lof](https://github.com/LinsVert/fund_lof)（`OMNI_LOF_API_URL`）+ 东财实时限额 | 工作日尾盘 `14:30~14:55` 筛选深市 `16xxxx` 可拖拉机套利 LOF，过滤旧净值假溢价并估算一拖六收益 |
 | `gold` | `scalar` | 东财批量（`AU9999` / `GC00Y` / `XAU`）+ `goldprice.org` + Binance `PAXGUSDT` | 覆盖上海金（元/克）、伦敦现货金、COMEX 期货及 7×24 小时 `PAXG` |
 | `us_stock` | `scalar` | 腾讯财经单次批量主源（`qt.gtimg.cn`）+ Nasdaq 官方 API 备源 | N 只美股任务合并为 1 次 HTTP 批量拉取；支持美东交易时段（含盘前盘后）过滤 |
 | `http_json` | `scalar` / `state` | 任意公开 JSON 接口 | 零代码监控任意 JSON API（按 `data.price` 等路径提取数值或监控内容指纹变化） |
@@ -58,7 +58,8 @@ cp .env.example .env
 # 2. 编辑 .env：
 #    - 设置强随机 OMNI_API_KEY（公网部署强烈建议开启）
 #    - 设置 OMNI_FCM_CREDENTIALS_PATH=secrets/firebase-sa.json
-#    - 如需联动 LOF 溢价服务，设置 OMNI_LOF_API_URL=http://lof-monitor:8000/api/funds
+#    - 如需启用 LOF 拖拉机套利提醒，先部署配套项目 https://github.com/LinsVert/fund_lof
+#      然后设置 OMNI_LOF_API_URL=http://lof-monitor:8000/api/funds
 #    将 Firebase Console 导出的 Service Account 私钥放至 secrets/firebase-sa.json
 
 # 3. 构建并启动（SQLite 数据持久化在 ./data，私钥只读挂载在 ./secrets）

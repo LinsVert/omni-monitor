@@ -1,4 +1,7 @@
-"""LOF tractor arbitrage collector: fuses internal LOF premium feed with live EastMoney daily limits."""
+"""
+LOF tractor arbitrage collector: fuses real-time LOF premium data from the companion
+open-source project https://github.com/LinsVert/fund_lof with live EastMoney daily limits.
+"""
 
 from __future__ import annotations
 
@@ -25,7 +28,7 @@ CN_TZ = ZoneInfo("Asia/Shanghai")
 class LofArbitrageConfig(BaseModel):
     lof_api_url: str = Field(
         default="",
-        description="LOF 行情接口地址；留空则自动读取环境变量 OMNI_LOF_API_URL（推荐 Docker 内网直连）",
+        description="配套项目 fund_lof (https://github.com/LinsVert/fund_lof) 的 /api/funds 接口地址；留空则读取环境变量 OMNI_LOF_API_URL",
     )
     min_premium_pct: float = Field(default=3.5, description="最低溢价率门槛 (%)")
     min_daily_limit: float = Field(default=100.0, description="单户最低可申购日限额 (元)")
@@ -106,7 +109,7 @@ def _fmt_limit(cat: str, lim: float | None) -> str:
 class LofArbitrageCollector(BaseCollector):
     plugin_type = "lof_arbitrage"
     display_name = "LOF 拖拉机套利监控"
-    description = "融合 LOF 实时溢价率与东财实时申购限额，在工作日尾盘 14:30-14:55 筛选可申购高溢价套利机会"
+    description = "联动配套项目 fund_lof (https://github.com/LinsVert/fund_lof) 实时溢价率与东财申购限额，在工作日尾盘 14:30-14:55 筛选套利机会"
     data_shape = "scalar"
     config_schema = LofArbitrageConfig
 
