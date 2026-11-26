@@ -150,6 +150,23 @@ def test_fastapi_apk_endpoints_end_to_end(tmp_path) -> None:
         tasks = client.get("/api/tasks", headers=headers).json()
         assert len(tasks) >= 5
 
+        # Regression test: PATCH updating rule + alert_policy + plugin_config must validate & persist cleanly
+        r_patch = client.patch(
+            "/api/tasks/gold_xau_usd",
+            headers=headers,
+            json={
+                "name": "伦敦现货黄金 (已修改)",
+                "enabled": True,
+                "interval_seconds": 180,
+                "plugin_config": {"instrument": "XAU"},
+                "rule": {"type": "threshold", "field": "value", "op": "lte", "target": 3350.0},
+                "alert_policy": {"mode": "hysteresis", "cooldown_seconds": 1800, "rearm_value": 3400.0, "severity": "high"},
+            },
+        )
+        assert r_patch.status_code == 200, r_patch.text
+        assert r_patch.json()["rule"]["target"] == 3350.0
+        assert r_patch.json()["alert_policy"]["severity"] == "high"
+
         # Register APK FCM device token & trigger test push
         r_dev = client.post(
             "/api/devices/fcm",

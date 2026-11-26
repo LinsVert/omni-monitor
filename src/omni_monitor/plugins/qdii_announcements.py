@@ -134,7 +134,7 @@ class QdiiAnnouncementsCollector(BaseCollector):
         assert isinstance(config, QdiiAnnouncementsConfig)
         targets = await self._resolve_target_funds(config, client)
         cutoff = (datetime.now() - timedelta(days=config.lookback_days)).strftime("%Y-%m-%d")
-        sem = asyncio.Semaphore(8)
+        sem = asyncio.Semaphore(12)
 
         async def _check_one(code: str, fund_name: str) -> list[dict[str, Any]]:
             async with sem:
@@ -142,6 +142,7 @@ class QdiiAnnouncementsCollector(BaseCollector):
                     "https://api.fund.eastmoney.com/f10/JJGG",
                     params={"fundcode": code, "pageIndex": 1, "pageSize": 15, "type": 5},
                     headers=EM_HEADERS,
+                    timeout=8.0,
                 )
                 resp.raise_for_status()
                 anns = resp.json().get("Data") or []
@@ -161,6 +162,7 @@ class QdiiAnnouncementsCollector(BaseCollector):
                                 "https://np-cnotice-stock.eastmoney.com/api/content/ann",
                                 params={"art_code": art_code, "client_source": "web", "page_index": 1},
                                 headers=EM_HEADERS,
+                                timeout=8.0,
                             )
                             c_resp.raise_for_status()
                             body = (c_resp.json().get("data") or {}).get("notice_content") or ""

@@ -163,14 +163,15 @@ def create_app(
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         updates = body.model_dump(exclude_unset=True)
-        if "plugin_config" in updates:
+        if "plugin_config" in updates and updates["plugin_config"] is not None:
             try:
                 collector = reg.get(task.plugin_type)
                 updates["plugin_config"] = collector.parse_config(updates["plugin_config"]).model_dump()
             except Exception as exc:
                 raise HTTPException(status_code=422, detail=f"Invalid plugin_config: {exc}") from exc
 
-        updated = task.model_copy(update={**updates, "updated_at": utc_now()})
+        merged = {**task.model_dump(), **updates, "updated_at": utc_now()}
+        updated = MonitorTask.model_validate(merged)
         store.upsert_task(updated)
         return updated.model_dump(mode="json")
 

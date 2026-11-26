@@ -17,6 +17,7 @@ class OmniApiClient(private val settingsStore: SettingsStore) {
         ignoreUnknownKeys = true
         isLenient = true
         coerceInputValues = true
+        encodeDefaults = true
     }
 
     private val httpClient = OkHttpClient.Builder()
