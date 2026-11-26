@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
@@ -25,6 +26,7 @@ EM_HEADERS = {
 UNLIMITED_THRESHOLD = 800_000_000.0
 VALID_EM_BUY_CODES = {str(i) for i in range(1, 11)}
 UNIVERSE_CACHE_TTL_SECONDS = 6 * 3600
+STANDING_LIMIT_CACHE_TTL_SECONDS = 6 * 3600
 
 
 def infer_currency(name: str) -> str:
@@ -86,8 +88,88 @@ def normalize_limit_status(
     return "LIMITED", raw_limit
 
 
-# Module-level cache shared by qdii_limits & qdii_announcements
+# Module-level caches shared by qdii_limits & qdii_announcements
 _UNIVERSE_CACHE: tuple[float, dict[str, dict[str, str]]] = (0.0, {})
+# code -> (cached_monotonic_ts, standing_limit_yuan_or_none, standing_is_unlimited)
+_STANDING_LIMIT_CACHE: dict[str, tuple[float, float | None, bool]] = {}
+
+
+async def _enrich_standing_limits(
+    items: dict[str, dict[str, Any]], client: httpx.AsyncClient
+) -> None:
+    """
+    On overseas market holidays (e.g. US Thanksgiving), Fund_JJJZ_Data masks daily_limit to 0.
+    Enrich suspended CNY funds with their standing MAXSG from EastMoney mobile API (cached 6h)
+    so the QDII board still shows exact standing limits (e.g. 5元 / 10元 / 200元 / 无限额).
+    """
+    now = time.monotonic()
+    to_fetch: list[str] = []
+
+    for code, item in items.items():
+        cat = item.get("limit_category")
+        if cat == "LIMITED":
+            item["standing_limit"] = item.get("daily_limit")
+            item["standing_unlimited"] = False
+            continue
+        if cat == "UNLIMITED":
+            item["standing_limit"] = None
+            item["standing_unlimited"] = True
+            continue
+        if cat not in ("HOLIDAY_SUSPENDED", "QUOTA_SUSPENDED"):
+            item["standing_limit"] = None
+            item["standing_unlimited"] = False
+            continue
+
+        cached = _STANDING_LIMIT_CACHE.get(code)
+        if cached and (now - cached[0]) < STANDING_LIMIT_CACHE_TTL_SECONDS:
+            item["standing_limit"] = cached[1]
+            item["standing_unlimited"] = cached[2]
+        elif item.get("currency") == "CNY":
+            to_fetch.append(code)
+        else:
+            item["standing_limit"] = None
+            item["standing_unlimited"] = False
+
+    if not to_fetch:
+        return
+
+    sem = asyncio.Semaphore(20)
+
+    async def _fetch_one(code: str) -> tuple[str, float | None, bool]:
+        async with sem:
+            resp = await client.get(
+                "https://fundmobapi.eastmoney.com/FundMNewApi/FundMNBasicInformation",
+                params={
+                    "FCODE": code,
+                    "deviceid": "123456",
+                    "plat": "Android",
+                    "product": "EFund",
+                    "version": "6.5.5",
+                },
+                headers=EM_HEADERS,
+                timeout=8.0,
+            )
+            resp.raise_for_status()
+            datas = resp.json().get("Datas") or {}
+            raw = datas.get("MAXSG")
+            if raw in (None, "", "--", "---"):
+                return code, None, False
+            val = float(raw)
+            if val >= UNLIMITED_THRESHOLD:
+                return code, None, True
+            if val > 0:
+                return code, val, False
+            return code, 0.0, False
+
+    results = await asyncio.gather(*(_fetch_one(c) for c in to_fetch), return_exceptions=True)
+    fetched_at = time.monotonic()
+    for res in results:
+        if isinstance(res, tuple):
+            code, lim, is_unlim = res
+            _STANDING_LIMIT_CACHE[code] = (fetched_at, lim, is_unlim)
+            if code in items:
+                items[code]["standing_limit"] = lim
+                items[code]["standing_unlimited"] = is_unlim
 
 
 async def get_qdii_universe(client: httpx.AsyncClient) -> dict[str, dict[str, str]]:
@@ -224,6 +306,7 @@ class QdiiLimitsCollector(BaseCollector):
 
         if len(items) < 200:
             raise RuntimeError(f"Sanity check failed: matched QDII rows unexpectedly low ({len(items)})")
+        await _enrich_standing_limits(items, client)
         return items
 
     def _filter_items(

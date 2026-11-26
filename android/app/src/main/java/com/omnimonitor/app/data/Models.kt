@@ -235,7 +235,10 @@ data class QdiiItemDto(
     @SerialName("nav_date") val navDate: String = "",
     @SerialName("purchase_status") val purchaseStatus: String = "",
     @SerialName("redeem_status") val redeemStatus: String = "",
+    @SerialName("min_purchase") val minPurchase: Double? = null,
     @SerialName("daily_limit") val dailyLimit: Double? = null,
+    @SerialName("standing_limit") val standingLimit: Double? = null,
+    @SerialName("standing_unlimited") val standingUnlimited: Boolean = false,
     @SerialName("limit_category") val limitCategory: String = "",
     @SerialName("fee_rate") val feeRate: String = "",
 )
@@ -246,6 +249,7 @@ data class LatestQdiiResponse(
     val timestamp: String = "",
     @SerialName("total_items") val totalItems: Int = 0,
     @SerialName("filtered_items_count") val filteredItemsCount: Int = 0,
+    @SerialName("category_counts") val categoryCounts: Map<String, Int> = emptyMap(),
     @SerialName("items_list") val itemsList: List<QdiiItemDto> = emptyList(),
 )
 

@@ -213,7 +213,13 @@ def create_app(
         payload = obs.model_dump(mode="json")
 
         if obs.items is not None:
-            items_list = list(obs.items.values())
+            all_list = list(obs.items.values())
+            category_counts: dict[str, int] = {}
+            for it in all_list:
+                cat = str(it.get("limit_category") or "OTHER")
+                category_counts[cat] = category_counts.get(cat, 0) + 1
+
+            items_list = all_list
             if q:
                 q_up = q.upper()
                 items_list = [
@@ -226,14 +232,27 @@ def create_app(
             if currency:
                 items_list = [it for it in items_list if it.get("currency") == currency]
             if sort_by == "daily_limit":
-                items_list.sort(
-                    key=lambda it: (
-                        it.get("daily_limit") is None,
-                        it.get("daily_limit") if isinstance(it.get("daily_limit"), (int, float)) else 1e18,
-                    )
-                )
+                cat_rank = {
+                    "LIMITED": 0,
+                    "UNLIMITED": 1,
+                    "HOLIDAY_SUSPENDED": 2,
+                    "QUOTA_SUSPENDED": 3,
+                    "NO_EM_LIMIT_DATA": 4,
+                    "OTHER": 5,
+                }
+                def _sort_key(it: dict[str, Any]) -> tuple[int, float, str]:
+                    cat = str(it.get("limit_category") or "OTHER")
+                    rank = cat_rank.get(cat, 9)
+                    eff_lim = it.get("daily_limit")
+                    if cat in ("HOLIDAY_SUSPENDED", "QUOTA_SUSPENDED"):
+                        eff_lim = it.get("standing_limit")
+                    num = float(eff_lim) if isinstance(eff_lim, (int, float)) and eff_lim > 0 else 1e18
+                    return (rank, num, str(it.get("code", "")))
+
+                items_list.sort(key=_sort_key)
             payload["total_items"] = len(obs.items)
             payload["filtered_items_count"] = len(items_list)
+            payload["category_counts"] = category_counts
             payload["items_list"] = items_list[:limit]
             # Omit raw map when returning filtered list to keep response lean for mobile
             payload.pop("items", None)
