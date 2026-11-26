@@ -175,3 +175,34 @@ def test_new_items_announcement_baseline_then_alert() -> None:
     assert res.matched is True
     assert res.severity == "high"
     assert any(b["type"] == "actions" for b in res.detail_blocks)
+
+
+def test_lof_arbitrage_scalar_with_items_emits_diff_list() -> None:
+    task = MonitorTask(
+        task_id="lof_arb",
+        name="LOF 拖拉机套利",
+        plugin_type="lof_arbitrage",
+        rule=RuleConfig(type="threshold", field="value", op="gte", target=1.0),
+        alert_policy=AlertPolicy(mode="cooldown", cooldown_seconds=36000, severity="high"),
+    )
+    obs = Observation(
+        task_id="lof_arb",
+        value=1.0,
+        unit="只",
+        metrics={"top_summary": "161128 标普信息科技LOF(+6.2%, 100元)"},
+        items={
+            "161128": {
+                "code": "161128",
+                "name": "标普信息科技LOF",
+                "event": "溢价+6.20%",
+                "before_text": "限额 100元 × 6户 · 净值日 2026-11-25",
+                "after_text": "估赚约 +35.7元 (6户共600元)",
+                "is_watchlist": True,
+                "url": "https://fund.eastmoney.com/161128.html",
+            }
+        },
+    )
+    res = evaluate_rule(task, obs, None)
+    assert res.matched is True
+    assert "161128" in res.summary
+    assert any(b["type"] == "diff_list" for b in res.detail_blocks)

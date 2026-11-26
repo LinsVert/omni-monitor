@@ -112,6 +112,24 @@ def seed_default_tasks(storage: Storage) -> int:
             rule=RuleConfig(type="expr", expression="metrics.change_pct is not None and metrics.change_pct <= -2.5"),
             alert_policy=AlertPolicy(mode="cooldown", cooldown_seconds=7200, severity="normal"),
         ),
+        MonitorTask(
+            task_id="lof_tractor_arbitrage",
+            name="LOF 拖拉机尾盘套利预警",
+            enabled=True,
+            plugin_type="lof_arbitrage",
+            interval_seconds=300,
+            plugin_config={
+                "lof_api_url": "",
+                "min_premium_pct": 3.5,
+                "min_daily_limit": 100.0,
+                "min_scale_cny": 10000000.0,
+                "szse_16_only": True,
+                "friction_pct": 0.25,
+                "trading_window_only": True,
+            },
+            rule=RuleConfig(type="threshold", field="value", op="gte", target=1.0),
+            alert_policy=AlertPolicy(mode="cooldown", cooldown_seconds=36000, severity="high"),
+        ),
     ]
 
     for task in defaults:

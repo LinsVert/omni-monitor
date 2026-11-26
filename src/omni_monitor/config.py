@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     scheduler_tick_seconds: int = 10
     seed_defaults: bool = True
     fcm_credentials_path: str = ""
+    lof_api_url: str = ""
     default_fetch_timeout: float = 45.0
     failure_alert_threshold: int = 3
     history_retention_days: int = 30

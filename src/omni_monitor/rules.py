@@ -169,7 +169,30 @@ def _build_scalar_blocks(
         kv_items.append({"label": "数据源", "value": curr.source_name})
     blocks.append({"type": "kv_grid", "items": kv_items})
 
-    if history and len(history) >= 2:
+    if curr.items:
+        diff_items = []
+        for key, item in list(curr.items.items())[:30]:
+            diff_items.append(
+                {
+                    "code": str(item.get("code") or key),
+                    "name": str(item.get("name") or key),
+                    "event": str(item.get("event") or "MATCH"),
+                    "before_text": str(item.get("before_text") or ""),
+                    "after_text": str(item.get("after_text") or ""),
+                    "is_watchlist": bool(item.get("is_watchlist", False)),
+                    "url": item.get("url"),
+                }
+            )
+        if diff_items:
+            blocks.append(
+                {
+                    "type": "diff_list",
+                    "title": f"{task.name} 命中标的明细",
+                    "items": diff_items,
+                }
+            )
+
+    if history and len(history) >= 2 and not curr.items:
         points = [
             [pt["timestamp"], pt["value"]]
             for pt in history[-60:]
@@ -285,10 +308,16 @@ def evaluate_rule(
 
         if not matched:
             return EvaluationResult(matched=False, scalar_value=float(val))
+        top_summary = str(curr.metrics.get("top_summary") or "").strip()
+        summary = (
+            top_summary
+            if top_summary
+            else f"当前 {val:g} {curr.unit}（满足 {cond_text}）".strip()
+        )
         return EvaluationResult(
             matched=True,
-            title=f"{task.name} 触发阈值",
-            summary=f"当前 {val:g} {curr.unit}（满足 {cond_text}）".strip(),
+            title=f"{task.name}: 命中 {val:g} {curr.unit}".strip() if top_summary else f"{task.name} 触发阈值",
+            summary=summary,
             severity=severity,
             detail_blocks=_build_scalar_blocks(task, curr, cond_text, history),
             scalar_value=float(val),
