@@ -247,7 +247,7 @@ private fun AlertCard(alert: AlertSummary, onClick: () -> Unit) {
                         shape = RoundedCornerShape(6.dp),
                     ) {
                         Text(
-                            text = alert.pluginType,
+                            text = pluginDisplayName(alert.pluginType),
                             style = MaterialTheme.typography.labelSmall,
                             color = accent,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -279,6 +279,40 @@ private fun AlertCard(alert: AlertSummary, onClick: () -> Unit) {
 
 private val LOCAL_TIME_FMT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+internal fun pluginDisplayName(pluginType: String): String = when (pluginType) {
+    "qdii_limits" -> "QDII 限购"
+    "qdii_announcements" -> "QDII 公告"
+    "lof_arbitrage" -> "LOF 套利"
+    "gold" -> "黄金行情"
+    "us_stock" -> "美股行情"
+    "http_json" -> "接口监控"
+    "system" -> "系统通知"
+    else -> pluginType
+}
+
+internal fun ruleTypeDisplayName(ruleType: String): String = when (ruleType) {
+    "threshold" -> "阈值触发"
+    "cross" -> "突破穿越"
+    "delta" -> "涨跌幅波动"
+    "state_change" -> "状态变更"
+    "expr" -> "自定义表达式"
+    "collection_diff" -> "额度变动"
+    "new_items" -> "新增公告"
+    else -> ruleType
+}
+
+internal fun eventDisplayName(event: String): String = when (event) {
+    "REOPENED" -> "恢复申购"
+    "LIMIT_UP" -> "额度上调"
+    "LIMIT_DOWN" -> "额度下调"
+    "QUOTA_SUSPENDED" -> "暂停申购"
+    "LIMIT_ADJUSTED" -> "限额调整"
+    "ADDED" -> "新增标的"
+    "CHANGED" -> "状态变更"
+    "NOTICE" -> "限购公告"
+    else -> event
+}
 
 internal fun formatTimestamp(iso: String): String {
     val trimmed = iso.trim()

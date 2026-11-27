@@ -275,6 +275,7 @@ def evaluate_rule(
     curr: Observation,
     prev: Observation | None,
     history: list[dict[str, Any]] | None = None,
+    seen_keys: set[str] | None = None,
 ) -> EvaluationResult:
     """Evaluate a MonitorTask's rule against the latest Observation."""
     rule = task.rule
@@ -446,6 +447,10 @@ def evaluate_rule(
         for key, after in curr_items.items():
             if not _passes_item_filters(after, rule):
                 continue
+            a_cat = after.get("limit_category")
+            if a_cat in ignore_cats:
+                continue
+
             before = prev_items.get(key)
             if before is None:
                 event = "ADDED"
@@ -467,9 +472,8 @@ def evaluate_rule(
                 continue
 
             b_cat = before.get("limit_category")
-            a_cat = after.get("limit_category")
-            # Ignore transitions entering or leaving holiday/non-distributed categories
-            if b_cat in ignore_cats or a_cat in ignore_cats:
+            # Ignore transitions leaving holiday/non-distributed categories
+            if b_cat in ignore_cats:
                 continue
 
             if all(before.get(f) == after.get(f) for f in watch_fields):
@@ -542,11 +546,18 @@ def evaluate_rule(
     if rule.type == "new_items":
         if curr.items is None:
             return EvaluationResult(matched=False)
-        if prev is None or prev.items is None:
-            # First run builds baseline so existing historical announcements don't spam
-            return EvaluationResult(matched=False)
+        if seen_keys is not None:
+            if not seen_keys and (prev is None or prev.items is None):
+                # First run builds baseline so existing historical announcements don't spam
+                return EvaluationResult(matched=False)
+            prev_keys = set(seen_keys)
+            if prev is not None and prev.items is not None:
+                prev_keys.update(prev.items.keys())
+        else:
+            if prev is None or prev.items is None:
+                return EvaluationResult(matched=False)
+            prev_keys = set(prev.items.keys())
 
-        prev_keys = set(prev.items.keys())
         new_entries: list[dict[str, Any]] = []
         watchlist = set(rule.watchlist_codes)
         watchlist_hits = 0
@@ -572,7 +583,9 @@ def evaluate_rule(
             if len(new_entries) == 1
             else f"发现 {len(new_entries)} 条新 QDII 限购公告"
         )
-        summary = top.get("title", "")[:90]
+        eff_str = f"生效:{top['effective_date']} · " if top.get("effective_date") else ""
+        lim_str = f"{top['limit_summary']} · " if top.get("limit_summary") and top.get("limit_summary") != top.get("action") else ""
+        summary = f"{eff_str}{lim_str}{top.get('title', '')}"[:120]
 
         detail_blocks: list[dict[str, Any]] = [
             {

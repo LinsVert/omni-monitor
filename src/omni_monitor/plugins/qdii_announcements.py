@@ -34,6 +34,15 @@ def is_quota_announcement(title: str) -> bool:
     )
 
 
+def _format_num_yuan(raw_num: str, unit: str = "") -> str:
+    try:
+        val = float(raw_num.replace(",", ""))
+        num_str = f"{val:g}"
+    except ValueError:
+        num_str = raw_num
+    return f"限额 {num_str}{unit}元"
+
+
 def _extract_fields(title: str, content: str) -> dict[str, Any]:
     text = re.sub(r"\s+", " ", content)
     if "恢复大额申购" in title or "恢复申购" in title or ("取消" in title and "限制" in title):
@@ -47,7 +56,7 @@ def _extract_fields(title: str, content: str) -> dict[str, Any]:
 
     eff_date = None
     for pat in (
-        r"(?:暂停|限制|调整|恢复)[^\u3002]{0,20}起始日[^\d]{0,10}(\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日)",
+        r"(?:暂停|限制|调整|恢复)[^\u3002]{0,25}起始日[^\d]{0,12}(\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日)",
         r"自\s*(\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日)\s*(?:起|开始)",
     ):
         m = re.search(pat, text)
@@ -56,14 +65,30 @@ def _extract_fields(title: str, content: str) -> dict[str, Any]:
             break
 
     limit_summary = ""
-    for pat in (
-        r"限制[^\u3002]{0,30}?金额(?:（[^）]*）|\([^)]*\))?[^\d]{0,12}([\d,]+(?:\.\d+)?)\s*(万|亿)?\s*元",
-        r"调整为\s*(?:人民币\s*)?([\d,]+(?:\.\d+)?)\s*(万|亿)?\s*元",
-    ):
-        m = re.search(pat, text)
-        if m:
-            limit_summary = f"{m.group(1)}{m.group(2) or ''}元"
-            break
+    # Pattern 1: Standard CSRC table format: "限制申购金额（单位：人民币元） 50.00" or "（单位：万元） 1.00"
+    table_m = re.search(
+        r"限制(?:大额)?(?:申购|定期定额投资)金额[（(][^）)]*?单位[：:]\s*(?:人民币)?(万|亿)?元[）)]\s*([\d,]+(?:\.\d+)?)",
+        text,
+    )
+    if table_m:
+        limit_summary = _format_num_yuan(table_m.group(2), table_m.group(1) or "")
+    else:
+        # Pattern 2: Prose format: "调整为5元", "限制申购金额为100万元", "单日累计不超过200元"
+        for pat in (
+            r"限制[^\u3002]{0,30}?金额(?:（[^）]*）|\([^)]*\))?[^\d]{0,12}([\d,]+(?:\.\d+)?)\s*(万|亿)?\s*元",
+            r"(?:调整为|上限为|不超过|限额为|设定为)\s*(?:人民币\s*)?([\d,]+(?:\.\d+)?)\s*(万|亿)?\s*元",
+        ):
+            m = re.search(pat, text)
+            if m:
+                limit_summary = _format_num_yuan(m.group(1), m.group(2) or "")
+                break
+
+    if not limit_summary:
+        limit_summary = {
+            "REOPENED": "恢复申购/取消限额",
+            "QUOTA_SUSPENDED": "暂停申购",
+            "LIMIT_ADJUSTED": "调整大额限额(见原文)",
+        }.get(action, "限购变动公告")
 
     snippet_m = re.search(
         r"([^。]{0,50}(?:限制申购金额|调整为|单日单个基金账户|暂停申购起始日)[^。]{0,110}。?)",
@@ -73,7 +98,7 @@ def _extract_fields(title: str, content: str) -> dict[str, Any]:
     return {
         "action": action,
         "effective_date": eff_date,
-        "limit_summary": limit_summary or action,
+        "limit_summary": limit_summary,
         "snippet": snippet,
     }
 

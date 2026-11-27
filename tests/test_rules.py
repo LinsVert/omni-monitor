@@ -217,3 +217,59 @@ def test_lof_is_nav_fresh_filters_stale_weekly_nav() -> None:
     assert is_nav_fresh("2026-11-24", max_age_days=4, today=today) is True
     assert is_nav_fresh("2026-11-20", max_age_days=4, today=today) is False
     assert is_nav_fresh("2026-11-20", max_age_days=0, today=today) is True
+
+
+def test_csrc_table_limit_regex_extracts_50_yuan() -> None:
+    from omni_monitor.plugins.qdii_announcements import _extract_fields
+
+    body = (
+        "调整大额定期定额投资起始日 2026年11月30日 "
+        "限制申购金额（单位：人民币元） 50.00 "
+        "限制定期定额投资金额（单位：人民币元） 50.00"
+    )
+    out = _extract_fields(
+        "关于大成纳斯达克100交易型开放式指数证券投资基金联接基金(QDII)调整大额申购的公告",
+        body,
+    )
+    assert out["effective_date"] == "2026年11月30日"
+    assert out["limit_summary"] == "限额 50元"
+
+
+def test_collection_diff_added_respects_ignore_categories() -> None:
+    task = MonitorTask(
+        task_id="qdii_limits",
+        name="QDII",
+        plugin_type="qdii_limits",
+        rule=RuleConfig(
+            type="collection_diff",
+            ignore_categories=["HOLIDAY_SUSPENDED", "OTHER"],
+            only_events=["ADDED", "LIMIT_UP"],
+        ),
+    )
+    prev = Observation(task_id="qdii_limits", items={"016452": {"name": "南方纳指", "limit_category": "LIMITED", "daily_limit": 10.0}})
+    curr = Observation(
+        task_id="qdii_limits",
+        items={
+            "016452": {"name": "南方纳指", "limit_category": "LIMITED", "daily_limit": 10.0},
+            "159329": {"name": "沙特ETF南方", "limit_category": "HOLIDAY_SUSPENDED", "daily_limit": 0.0},
+        },
+    )
+    assert evaluate_rule(task, curr, prev).matched is False
+
+
+def test_new_items_permanent_seen_keys_prevent_duplicate_push_after_timeout_drop() -> None:
+    task = MonitorTask(
+        task_id="qdii_ann",
+        name="公告",
+        plugin_type="qdii_announcements",
+        rule=RuleConfig(type="new_items"),
+    )
+    # Previous run lost AN001 due to upstream timeout (prev.items is empty),
+    # but seen_keys remembers AN001 was already alerted -> MUST NOT alert again!
+    prev_dropped = Observation(task_id="qdii_ann", items={})
+    curr_recovered = Observation(
+        task_id="qdii_ann",
+        items={"AN001": {"code": "000834", "fund_name": "大成纳指A", "title": "调整大额申购"}},
+    )
+    res = evaluate_rule(task, curr_recovered, prev_dropped, seen_keys={"AN001"})
+    assert res.matched is False

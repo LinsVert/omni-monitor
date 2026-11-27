@@ -206,7 +206,7 @@ private fun TaskCard(
                             shape = RoundedCornerShape(6.dp),
                         ) {
                             Text(
-                                text = task.pluginType,
+                                text = pluginDisplayName(task.pluginType),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = SkyAccent,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -233,7 +233,7 @@ private fun TaskCard(
 
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "频率: 每 ${task.intervalSeconds}s · 规则: ${task.rule.type}" +
+                text = "频率: 每 ${task.intervalSeconds}s · 规则: ${ruleTypeDisplayName(task.rule.type)}" +
                     (task.state.lastSuccessAt?.let { " · 上次成功: ${formatTimestamp(it)}" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -151,7 +151,17 @@ class MonitorEngine:
         else:
             history_with_curr = None
 
-        eval_res = evaluate_rule(task, obs, prev, history=history_with_curr)
+        seen_keys: set[str] | None = None
+        if task.rule.type == "new_items":
+            seen_keys = self.storage.get_seen_item_keys(task.task_id)
+            if not seen_keys and prev is not None and prev.items is not None:
+                # One-time migration from existing latest_observations baseline
+                self.storage.mark_items_seen(task.task_id, set(prev.items.keys()))
+                seen_keys = set(prev.items.keys())
+
+        eval_res = evaluate_rule(
+            task, obs, prev, history=history_with_curr, seen_keys=seen_keys
+        )
         should_send, next_state, should_disable = apply_alert_policy(
             task.alert_policy, state, eval_res, now, rule=task.rule
         )
@@ -162,8 +172,10 @@ class MonitorEngine:
         next_state.last_error = None
         next_state.meta_alerted = False
 
-        # Save observation + state
+        # Save observation + state (+ permanent seen keys for new_items dedup)
         self.storage.save_observation(obs, retention_days=self.settings.history_retention_days)
+        if task.rule.type == "new_items" and obs.items:
+            self.storage.mark_items_seen(task.task_id, set(obs.items.keys()))
         self.storage.save_task_state(next_state)
         if should_disable:
             self.storage.set_task_enabled(task.task_id, False)

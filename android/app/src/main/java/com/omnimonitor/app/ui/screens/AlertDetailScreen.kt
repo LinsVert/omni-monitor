@@ -379,7 +379,7 @@ private fun DiffItemRow(item: DiffItem, onOpenUrl: (String) -> Unit) {
                 shape = RoundedCornerShape(6.dp),
             ) {
                 Text(
-                    text = item.event,
+                    text = eventDisplayName(item.event),
                     style = MaterialTheme.typography.labelSmall,
                     color = badgeColor,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),

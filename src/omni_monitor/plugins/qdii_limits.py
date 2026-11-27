@@ -312,12 +312,17 @@ class QdiiLimitsCollector(BaseCollector):
     def _filter_items(
         self, all_items: dict[str, dict[str, Any]], cfg: QdiiLimitsConfig
     ) -> dict[str, dict[str, Any]]:
+        etf_prefixes = ("159", "510", "511", "512", "513", "515", "516", "518", "520", "560", "561", "562", "563", "588")
         filtered: dict[str, dict[str, Any]] = {}
         for code, item in all_items.items():
             if cfg.currencies and item["currency"] not in cfg.currencies:
                 continue
-            if cfg.exclude_exchange_etf and item["purchase_status"] == "场内交易":
-                continue
+            if cfg.exclude_exchange_etf:
+                is_exchange_etf = item["purchase_status"] == "场内交易" or (
+                    code.startswith(etf_prefixes) and "联接" not in item["name"]
+                )
+                if is_exchange_etf:
+                    continue
             if cfg.keywords:
                 haystack = f"{item['name']} {item['fund_type']}".upper()
                 if not any(kw.upper() in haystack for kw in cfg.keywords):

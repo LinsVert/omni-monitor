@@ -121,6 +121,14 @@ class Storage:
                     device_name TEXT NOT NULL DEFAULT '',
                     updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS seen_items (
+                    task_id TEXT NOT NULL,
+                    item_key TEXT NOT NULL,
+                    first_seen_at TEXT NOT NULL,
+                    PRIMARY KEY (task_id, item_key),
+                    FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
+                );
                 """
             )
 
@@ -481,3 +489,25 @@ class Storage:
                 tokens,
             )
             return cur.rowcount
+
+    # ------------------------------------------------------------------
+    # Permanent Seen Item Keys (idempotent dedup for new_items rules)
+    # ------------------------------------------------------------------
+
+    def get_seen_item_keys(self, task_id: str) -> set[str]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT item_key FROM seen_items WHERE task_id = ?",
+                (task_id,),
+            ).fetchall()
+        return {r["item_key"] for r in rows}
+
+    def mark_items_seen(self, task_id: str, item_keys: list[str] | set[str]) -> None:
+        if not item_keys:
+            return
+        now_iso = _to_iso(utc_now())
+        with self._lock, self._conn:
+            self._conn.executemany(
+                "INSERT OR IGNORE INTO seen_items (task_id, item_key, first_seen_at) VALUES (?, ?, ?)",
+                [(task_id, k, now_iso) for k in item_keys],
+            )
