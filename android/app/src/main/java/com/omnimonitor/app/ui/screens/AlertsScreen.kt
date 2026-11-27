@@ -53,6 +53,10 @@ import com.omnimonitor.app.ui.theme.AmberWarn
 import com.omnimonitor.app.ui.theme.RedAlert
 import com.omnimonitor.app.ui.theme.SkyAccent
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -273,9 +277,17 @@ private fun AlertCard(alert: AlertSummary, onClick: () -> Unit) {
     }
 }
 
+private val LOCAL_TIME_FMT: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
 internal fun formatTimestamp(iso: String): String {
-    if (iso.length >= 16) {
-        return iso.substring(0, 16).replace("T", " ")
+    val trimmed = iso.trim()
+    if (trimmed.isBlank()) return ""
+    return runCatching {
+        val instant = runCatching { Instant.parse(trimmed) }
+            .getOrElse { OffsetDateTime.parse(trimmed).toInstant() }
+        instant.atZone(ZoneId.systemDefault()).format(LOCAL_TIME_FMT)
+    }.getOrElse {
+        if (trimmed.length >= 16) trimmed.substring(0, 16).replace("T", " ") else trimmed
     }
-    return iso
 }

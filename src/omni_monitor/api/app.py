@@ -341,7 +341,7 @@ def create_app(
                     "type": "kv_grid",
                     "items": [
                         {"label": "消息类型", "value": "FCM 连通性测试"},
-                        {"label": "触发时间", "value": utc_now().isoformat()},
+                        {"label": "触发时间", "value": utc_now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")},
                     ],
                 }
             ],
